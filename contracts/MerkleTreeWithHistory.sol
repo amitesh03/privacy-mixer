@@ -1,4 +1,4 @@
-﻿// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
 /// @title MerkleTreeWithHistory
@@ -12,16 +12,18 @@ abstract contract MerkleTreeWithHistory {
     uint32 public currentRootIndex;
     uint32 public nextIndex;
 
+    // Precomputed zero values for each level (keccak256-based for testing)
     bytes32[] public zeros;
 
     event LeafInserted(bytes32 indexed leaf, uint32 leafIndex, bytes32 root);
 
     constructor(uint32 levels_) {
-        require(levels_ > 0 && levels_ < 32, "MerkleTree: invalid levels");
+        require(levels_ > 0 && levels_ <= 32, "MerkleTree: invalid levels");
         levels = levels_;
         filledSubtrees = new bytes32[](levels_);
         zeros = new bytes32[](levels_);
 
+        // Compute zero values
         zeros[0] = keccak256(abi.encodePacked(uint256(0)));
         for (uint32 i = 1; i < levels_; i++) {
             zeros[i] = hashLeftRight(zeros[i - 1], zeros[i - 1]);
@@ -33,6 +35,7 @@ abstract contract MerkleTreeWithHistory {
     }
 
     function _insert(bytes32 leaf) internal returns (uint32 index) {
+        require(nextIndex < 2 ** levels, "MerkleTree: tree full");
         index = nextIndex;
         uint32 currentIndex = index;
         bytes32 currentLevelHash = leaf;
