@@ -1,6 +1,7 @@
 ﻿// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "./MerkleTreeWithHistory.sol";
 
 interface IVerifier {
@@ -9,7 +10,7 @@ interface IVerifier {
 
 /// @title ETHMixer
 /// @notice Privacy mixer: deposit fixed denomination ETH, withdraw to any address with ZK proof
-contract ETHMixer is MerkleTreeWithHistory {
+contract ETHMixer is MerkleTreeWithHistory, ReentrancyGuard {
     uint256 public immutable denomination;
     IVerifier public immutable verifier;
 
@@ -31,7 +32,7 @@ contract ETHMixer is MerkleTreeWithHistory {
     }
 
     /// @notice Deposit exactly `denomination` ETH with a commitment
-    function deposit(bytes32 commitment) external payable {
+    function deposit(bytes32 commitment) external payable nonReentrant {
         require(msg.value == denomination, "Mixer: wrong denomination");
         require(!commitments[commitment], "Mixer: duplicate commitment");
         commitments[commitment] = true;
@@ -40,6 +41,12 @@ contract ETHMixer is MerkleTreeWithHistory {
     }
 
     /// @notice Withdraw using a ZK proof
+    /// @param proof Groth16 proof bytes
+    /// @param root Merkle root (must be in history)
+    /// @param nullifierHash Poseidon(nullifier) - prevents double-spend
+    /// @param recipient Withdrawal address
+    /// @param relayer Optional relayer address (address(0) if none)
+    /// @param fee Relayer fee in wei
     function withdraw(
         bytes calldata proof,
         bytes32 root,
@@ -48,7 +55,7 @@ contract ETHMixer is MerkleTreeWithHistory {
         address payable relayer,
         uint256 fee,
         uint256 refund
-    ) external payable {
+    ) external payable nonReentrant {
         require(fee <= denomination, "Mixer: fee too large");
         require(!nullifierHashes[nullifierHash], "Mixer: already spent");
         require(isKnownRoot(root), "Mixer: unknown root");
@@ -69,11 +76,17 @@ contract ETHMixer is MerkleTreeWithHistory {
             "Mixer: invalid proof"
         );
 
+        // CEI: update state before external calls
         nullifierHashes[nullifierHash] = true;
 
         uint256 payout = denomination - fee;
         (bool ok,) = recipient.call{value: payout}("");
         require(ok, "Mixer: recipient transfer failed");
+
+        if (fee > 0 && relayer != address(0)) {
+            (bool feeOk,) = relayer.call{value: fee}("");
+            require(feeOk, "Mixer: relayer transfer failed");
+        }
 
         emit Withdrawal(recipient, nullifierHash, relayer, fee);
     }
