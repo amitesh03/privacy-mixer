@@ -1,6 +1,6 @@
-﻿import { expect } from 'chai'
+import { expect } from 'chai'
 import { ethers } from 'hardhat'
-import { keccak256 } from 'ethers'
+import { keccak256, toUtf8Bytes } from 'ethers'
 
 describe('ETHMixer', () => {
   const DENOMINATION = ethers.parseEther('1')
@@ -94,11 +94,48 @@ describe('ETHMixer', () => {
       expect(relayerAfter - relayerBefore).to.equal(fee)
     })
 
+    it('reverts double spend (same nullifier)', async () => {
+      const { mixer, recipient, nullifierHash, root } = await depositAndGetRoot()
+      await mixer.withdraw('0x', root, nullifierHash, recipient.address as `0x${string}`, ethers.ZeroAddress as `0x${string}`, 0, 0)
+      await expect(
+        mixer.withdraw('0x', root, nullifierHash, recipient.address as `0x${string}`, ethers.ZeroAddress as `0x${string}`, 0, 0)
+      ).to.be.revertedWith('Mixer: already spent')
+    })
+
+    it('reverts unknown root', async () => {
+      const { mixer, recipient, nullifierHash } = await depositAndGetRoot()
+      const fakeRoot = ethers.randomBytes(32)
+      await expect(
+        mixer.withdraw('0x', fakeRoot, nullifierHash, recipient.address as `0x${string}`, ethers.ZeroAddress as `0x${string}`, 0, 0)
+      ).to.be.revertedWith('Mixer: unknown root')
+    })
+
     it('reverts fee > denomination', async () => {
       const { mixer, recipient, nullifierHash, root } = await depositAndGetRoot()
       await expect(
         mixer.withdraw('0x', root, nullifierHash, recipient.address as `0x${string}`, ethers.ZeroAddress as `0x${string}`, DENOMINATION + 1n, 0)
       ).to.be.revertedWith('Mixer: fee too large')
+    })
+  })
+
+  describe('MerkleTree', () => {
+    it('root history tracks last 30 roots', async () => {
+      const { mixer, depositor } = await deploy()
+      const roots = new Set<string>()
+      for (let i = 0; i < 5; i++) {
+        const c = keccak256(ethers.randomBytes(32))
+        await mixer.connect(depositor).deposit(c, { value: DENOMINATION })
+        roots.add(await mixer.getLastRoot())
+      }
+      // All recent roots should be known
+      for (const root of roots) {
+        expect(await mixer.isKnownRoot(root)).to.be.true
+      }
+    })
+
+    it('unknown root returns false', async () => {
+      const { mixer } = await deploy()
+      expect(await mixer.isKnownRoot(ethers.randomBytes(32))).to.be.false
     })
   })
 })
