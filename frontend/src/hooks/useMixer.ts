@@ -1,4 +1,4 @@
-﻿import { useState, useCallback } from 'react'
+import { useState, useCallback } from 'react'
 import { usePublicClient, useWalletClient } from 'wagmi'
 import { keccak256, encodePacked, type Hex } from 'viem'
 import { MIXER_ADDRESS, MIXER_ABI, DENOMINATION } from '../config/contracts'
