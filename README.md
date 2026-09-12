@@ -1,4 +1,4 @@
-# Privacy Mixer
+# Privacy Mixer (Inspired from Tornado Cash)
 
 A privacy-preserving protocol for non-interactive Ethereum transfers on the Sepolia testnet. Privacy Mixer breaks the on-chain link between sender and recipient addresses by pooling fixed-denomination deposits into an incremental Merkle tree and validating withdrawals through zero-knowledge proofs and cryptographic nullifiers.
 

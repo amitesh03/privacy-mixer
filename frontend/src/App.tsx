@@ -179,7 +179,7 @@ export default function App() {
                   PRIVACY MIXER
                 </h1>
                 <p className="text-[10px] text-accent-600 font-bold tracking-[0.2em] uppercase">
-                  ZK · Sepolia Testnet
+                  ZK · Sepolia Testnet · Inspired from Tornado Cash
                 </p>
               </div>
             </motion.div>
